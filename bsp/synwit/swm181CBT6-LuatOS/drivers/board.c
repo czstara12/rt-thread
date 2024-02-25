@@ -77,6 +77,11 @@ void rt_hw_board_init()
 #if defined(RT_USING_USER_MAIN) && defined(RT_USING_HEAP)
     rt_system_heap_init(rt_heap_begin_get(), rt_heap_end_get());
 #endif
+
+#ifdef RT_USING_CONSOLE
+    /* set console device */
+    rt_console_set_device(RT_CONSOLE_DEVICE_NAME);
+#endif
 }
 
 void SysTick_Handler(void)
@@ -88,4 +93,23 @@ void SysTick_Handler(void)
 
     /* leave interrupt */
     rt_interrupt_leave();
+}
+
+/**
+ * This function is used to display a string on console, normally, it's
+ * invoked by rt_kprintf
+ *
+ * @param str the displayed string
+ */
+void rt_hw_console_output(const char *str)
+{
+    while (*str)
+    {
+        if (*str == '\n')
+        {
+            /* Todo:write data (\r) to serial hardware */
+        }
+        /* Todo:write data (*str) to serial hardware */
+        str++;
+    }
 }

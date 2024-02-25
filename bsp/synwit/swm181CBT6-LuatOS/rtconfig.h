@@ -221,18 +221,32 @@
 
 /* Hardware Drivers Config */
 
-#define SOC_STM32F091RC
-
-/* Onboard Peripheral Drivers */
-
 /* On-chip Peripheral Drivers */
 
 #define BSP_USING_GPIO
-#define BSP_USING_UART
+
+/* HWtimer Drivers */
+
+
+/* I2C Drivers */
+
+
+/* PWM Drivers */
+
+
+/* SPI Drivers */
+
+
+/* UART Drivers */
+
+#define BSP_USING_UART0
 #define BSP_USING_UART1
 
-/* Board extended module Drivers */
+/* Onboard Peripheral Drivers */
 
+/* Offboard Peripheral Drivers */
+
+#define SOC_SWM181CBT6
 #define SOC_SWM181
 
 #endif
