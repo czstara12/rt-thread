@@ -15,65 +15,104 @@
 
 #ifdef RT_USING_SERIAL
 
-#define SKT_UART_DEVICE(uart)    (struct skt_uart_dev *)(uart)
+#define swm181_UART_DEVICE(uart) (struct swm181_uart_dev *)(uart)
 
-static struct skt_uart_dev uart0_dev;
+static struct swm181_uart_dev uart0_dev;
 
-struct skt_uart_dev
+struct swm181_uart_dev
 {
     struct rt_serial_device parent;
-    rt_uint32_t uart_periph;
-    rt_uint32_t irqno;
 };
 
-void skt_uart_isr(int irqno, void *param)
+void IRQ0_Handler(void)
 {
-    struct skt_uart_dev *uart = SKT_UART_DEVICE(param);
-
-    RT_ASSERT(uart != RT_NULL);
-
     /* read interrupt status and clear it */
-    if (0) /* rx ind */
+    if (UART_INTRXThresholdStat(UART0) || UART_INTTimeoutStat(UART0)) /* rx ind */
     {
-        rt_hw_serial_isr(&uart->parent, RT_SERIAL_EVENT_RX_IND);
+        rt_hw_serial_isr(&uart0_dev.parent, RT_SERIAL_EVENT_RX_IND);
     }
 
     if (0) /* tx done */
     {
-        rt_hw_serial_isr(&uart->parent, RT_SERIAL_EVENT_TX_DONE);
+        rt_hw_serial_isr(&uart0_dev.parent, RT_SERIAL_EVENT_TX_DONE);
     }
 }
 
 /*
  * UART interface
  */
-static rt_err_t skt_uart_configure(struct rt_serial_device *serial, struct serial_configure *cfg)
+static rt_err_t swm181_uart_configure(struct rt_serial_device *serial, struct serial_configure *cfg)
 {
     rt_err_t ret = RT_EOK;
-    struct skt_uart_dev *uart;
+    struct swm181_uart_dev *uart;
 
     RT_ASSERT(serial != RT_NULL);
 
     serial->config = *cfg;
 
-    uart = SKT_UART_DEVICE(serial->parent.user_data);
+    uart = swm181_UART_DEVICE(serial->parent.user_data);
     RT_ASSERT(uart != RT_NULL);
 
     /* Init UART Hardware(uart->uart_periph) */
+    UART_InitStructure UART_initStruct;
 
-    /* Enable UART clock */
-
-    /* Set both receiver and transmitter in UART mode (not SIR) */
-
-    /* according to (cfg) set databits, baudrate, stopbits and parity. (8-bit data, 1 stopbit, no parity) */
-
+    UART_initStruct.Baudrate = cfg->baud_rate;
+    switch (cfg->data_bits)
+    {
+    case DATA_BITS_8:
+        UART_initStruct.DataBits = UART_DATA_8BIT;
+        break;
+    case DATA_BITS_9:
+        UART_initStruct.DataBits = UART_DATA_9BIT;
+        break;
+    default:
+        UART_initStruct.DataBits = UART_DATA_8BIT;
+        break;
+    }
+    switch (cfg->parity)
+    {
+    case PARITY_NONE:
+        UART_initStruct.Parity = UART_PARITY_NONE;
+        break;
+    case PARITY_ODD:
+        UART_initStruct.Parity = UART_PARITY_ODD;
+        break;
+    case PARITY_EVEN:
+        UART_initStruct.Parity = UART_PARITY_EVEN;
+        break;
+    default:
+        UART_initStruct.Parity = UART_PARITY_NONE;
+        break;
+    }
+    switch (cfg->stop_bits)
+    {
+    case STOP_BITS_1:
+        UART_initStruct.StopBits = UART_STOP_1BIT;
+        break;
+    case STOP_BITS_2:
+        UART_initStruct.StopBits = UART_STOP_2BIT;
+        break;
+    default:
+        UART_initStruct.StopBits = UART_STOP_1BIT;
+        break;
+    }
+    UART_initStruct.RXThreshold = 3;
+    UART_initStruct.RXThresholdIEn = 1;
+    UART_initStruct.TXThreshold = 3;
+    UART_initStruct.TXThresholdIEn = 0;
+    UART_initStruct.TimeoutTime = 10;
+    UART_initStruct.TimeoutIEn = 1;
+    UART_Init(UART0, &UART_initStruct);
+    IRQ_Connect(IRQ0_15_UART0, IRQ0_IRQ, 1);
+    NVIC_DisableIRQ(IRQ0_IRQ);
+    UART_Open(UART0);
     return ret;
 }
 
-static rt_err_t skt_uart_control(struct rt_serial_device *serial, int cmd, void *arg)
+static rt_err_t swm181_uart_control(struct rt_serial_device *serial, int cmd, void *arg)
 {
     rt_err_t ret = RT_EOK;
-    struct skt_uart_dev *uart = SKT_UART_DEVICE(serial->parent.user_data);
+    struct swm181_uart_dev *uart = swm181_UART_DEVICE(serial->parent.user_data);
 
     RT_ASSERT(uart != RT_NULL);
 
@@ -83,24 +122,19 @@ static rt_err_t skt_uart_control(struct rt_serial_device *serial, int cmd, void 
     {
     case RT_DEVICE_CTRL_CLR_INT:
         /* Disable the UART Interrupt */
-        /* rt_hw_interrupt_mask(uart->irqno); */
+        NVIC_DisableIRQ(IRQ0_IRQ);
         break;
 
     case RT_DEVICE_CTRL_SET_INT:
         /* install interrupt */
-        /*
-        rt_hw_interrupt_install(uart->irqno, skt_uart_isr,
-                                serial, serial->parent.parent.name);
-        */
         /* Enable the UART Interrupt */
-        /* rt_hw_interrupt_umask(uart->irqno);*/
-
+        NVIC_EnableIRQ(IRQ0_IRQ);
         break;
 
     case RT_DEVICE_CTRL_CONFIG:
         if (ctrl_arg == RT_DEVICE_FLAG_DMA_RX)
         {
-            /* Todo: DMA configuration  */
+            /* No DMA */
         }
         break;
     }
@@ -108,36 +142,43 @@ static rt_err_t skt_uart_control(struct rt_serial_device *serial, int cmd, void 
     return ret;
 }
 
-static int skt_uart_putc(struct rt_serial_device *serial, char c)
+static int swm181_uart_putc(struct rt_serial_device *serial, char c)
 {
-    struct skt_uart_dev *uart = SKT_UART_DEVICE(serial->parent.user_data);
+    struct swm181_uart_dev *uart = swm181_UART_DEVICE(serial->parent.user_data);
 
     RT_ASSERT(uart != RT_NULL);
 
     /* FIFO status, contain valid data */
-
-    /* Todo:write data (ch) to (uart->uart_periph) */
+    while (UART_IsTXFIFOFull(UART0) == 1)
+        ;
+    UART_WriteByte(UART0, c);
 
     return 1;
 }
 
-static int skt_uart_getc(struct rt_serial_device *serial)
+static int swm181_uart_getc(struct rt_serial_device *serial)
 {
     int ch;
-    struct skt_uart_dev *uart = SKT_UART_DEVICE(serial->parent.user_data);
+    struct swm181_uart_dev *uart = swm181_UART_DEVICE(serial->parent.user_data);
 
     RT_ASSERT(uart != RT_NULL);
 
     ch = -1;
 
-    /* Todo:receive data from (uart->uart_periph) and store it in (ch) */
+    if (UART_IsRXFIFOEmpty(UART0) == 0)
+    {
+        if (UART_ReadByte(UART0, &ch) != 0)
+        {
+            ch = 0;
+        }
+    }
 
     return ch;
 }
 
-static rt_size_t skt_uart_dma_transmit(struct rt_serial_device *serial, rt_uint8_t *buf, rt_size_t size, int direction)
+static rt_size_t swm181_uart_dma_transmit(struct rt_serial_device *serial, rt_uint8_t *buf, rt_size_t size, int direction)
 {
-    struct skt_uart_dev *uart = SKT_UART_DEVICE(serial->parent.user_data);
+    struct swm181_uart_dev *uart = swm181_UART_DEVICE(serial->parent.user_data);
 
     RT_ASSERT(uart != RT_NULL);
 
@@ -145,29 +186,26 @@ static rt_size_t skt_uart_dma_transmit(struct rt_serial_device *serial, rt_uint8
 }
 
 const static struct rt_uart_ops _uart_ops =
-{
-    skt_uart_configure,
-    skt_uart_control,
-    skt_uart_putc,
-    skt_uart_getc,
-    skt_uart_dma_transmit
-};
+    {
+        swm181_uart_configure,
+        swm181_uart_control,
+        swm181_uart_putc,
+        swm181_uart_getc,
+        swm181_uart_dma_transmit};
 
 /*
  * UART Initiation
  */
 int rt_hw_uart_init(void)
 {
+    struct serial_configure serial_cfg = RT_SERIAL_CONFIG_DEFAULT;
     rt_err_t ret = RT_EOK;
 
-    struct serial_configure config = RT_SERIAL_CONFIG_DEFAULT;
+    PORT_Init(PORTA, PIN0, FUNMUX_UART0_RXD, 1);
+    PORT_Init(PORTA, PIN1, FUNMUX_UART0_TXD, 0);
 
     uart0_dev.parent.ops = &_uart_ops;
-    uart0_dev.parent.config = config;
-
-    /* Todo: Init uart0_dev other data */
-
-    /* Todo: Init uart0 hardware */
+    uart0_dev.parent.config = serial_cfg;
 
     ret = rt_hw_serial_register(&uart0_dev.parent,
                                 "uart0",
@@ -176,6 +214,6 @@ int rt_hw_uart_init(void)
 
     return ret;
 }
-INIT_DEVICE_EXPORT(rt_hw_uart_init);
+INIT_BOARD_EXPORT(rt_hw_uart_init);
 
 #endif /* RT_USING_SERIAL */

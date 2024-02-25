@@ -13,24 +13,63 @@
 
 #ifdef RT_USING_PIN
 
-static void skt_pin_mode(struct rt_device *device, rt_base_t pin, rt_base_t mode)
+static void swm181_pin_mode(struct rt_device *device, rt_base_t pin, rt_base_t mode)
 {
-    /* Todo:set pin mode */
+    int dir = 0;
+    int pull_up = 0;
+    int pull_down = 0;
+    int open_drain = 0;
+
+    /* Configure GPIO_InitStructure */
+    switch (mode)
+    {
+    case PIN_MODE_OUTPUT:
+        /* output setting */
+        dir = 1;
+        break;
+    case PIN_MODE_INPUT:
+        /* input setting: not pull. */
+        dir = 0;
+        break;
+    case PIN_MODE_INPUT_PULLUP:
+        /* input setting: pull up. */
+        dir = 0;
+        pull_up = 1;
+        break;
+    case PIN_MODE_INPUT_PULLDOWN:
+        /* input setting: pull down. */
+        dir = 0;
+        pull_down = 1;
+        break;
+    case PIN_MODE_OUTPUT_OD:
+        /* output setting: od. */
+        dir = 1;
+        open_drain = 1;
+        break;
+    }
+
+    GPIO_Init(GPIOB, pin, dir, pull_up, pull_down, open_drain);
 }
 
-static void skt_pin_write(struct rt_device *device, rt_base_t pin, rt_base_t value)
+static void swm181_pin_write(struct rt_device *device, rt_base_t pin, rt_base_t value)
 {
-    /* Todo:set pin low or high */
+    if (value)
+    {
+        GPIO_AtomicSetBit(GPIOB, pin);
+    }
+    else
+    {
+        GPIO_AtomicClrBit(GPIOB, pin);
+    }
 }
 
-static int skt_pin_read(struct rt_device *device, rt_base_t pin)
+static int swm181_pin_read(struct rt_device *device, rt_base_t pin)
 {
-    /* Todo:get pin status and return status value */
-    return 0;
+    return (int)GPIO_GetBit(GPIOB, pin);
 }
 
-static rt_err_t skt_pin_attach_irq(struct rt_device *device, rt_int32_t pin,
-                                   rt_uint32_t mode, void (*hdr)(void *args), void *args)
+static rt_err_t swm181_pin_attach_irq(struct rt_device *device, rt_int32_t pin,
+                                      rt_uint32_t mode, void (*hdr)(void *args), void *args)
 {
     rt_err_t ret = RT_EOK;
 
@@ -39,7 +78,7 @@ static rt_err_t skt_pin_attach_irq(struct rt_device *device, rt_int32_t pin,
     return ret;
 }
 
-static rt_err_t skt_pin_detach_irq(struct rt_device *device, rt_int32_t pin)
+static rt_err_t swm181_pin_detach_irq(struct rt_device *device, rt_int32_t pin)
 {
     rt_err_t ret = RT_EOK;
 
@@ -48,7 +87,7 @@ static rt_err_t skt_pin_detach_irq(struct rt_device *device, rt_int32_t pin)
     return ret;
 }
 
-static rt_err_t skt_pin_irq_enable(struct rt_device *device, rt_base_t pin, rt_uint32_t enabled)
+static rt_err_t swm181_pin_irq_enable(struct rt_device *device, rt_base_t pin, rt_uint32_t enabled)
 {
     rt_err_t ret = RT_EOK;
 
@@ -57,22 +96,21 @@ static rt_err_t skt_pin_irq_enable(struct rt_device *device, rt_base_t pin, rt_u
     return ret;
 }
 
-const static struct rt_pin_ops skt_pin_ops =
-{
-    skt_pin_mode,
-    skt_pin_write,
-    skt_pin_read,
+const static struct rt_pin_ops swm181_pin_ops =
+    {
+        swm181_pin_mode,
+        swm181_pin_write,
+        swm181_pin_read,
 
-    skt_pin_attach_irq,
-    skt_pin_detach_irq,
-    skt_pin_irq_enable
-};
+        swm181_pin_attach_irq,
+        swm181_pin_detach_irq,
+        swm181_pin_irq_enable};
 
 int rt_hw_pin_init(void)
 {
     rt_err_t ret = RT_EOK;
 
-    ret = rt_device_pin_register("pin", &skt_pin_ops, RT_NULL);
+    ret = rt_device_pin_register("pin", &swm181_pin_ops, RT_NULL);
 
     return ret;
 }

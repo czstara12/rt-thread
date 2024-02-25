@@ -3,9 +3,16 @@ menu "Hardware Drivers Config"
     menu "On-chip Peripheral Drivers"
 
         config BSP_USING_GPIO
-            bool "Enable GPIO"
+            bool "Enable GPIOB"
             select RT_USING_PIN
             default y
+
+        menu "UART Drivers"
+            config BSP_USING_UART0
+                bool "Enable UART0 (PA0/1,RX/TX)"
+                select RT_USING_SERIAL
+                default y
+        endmenu
 
         config BSP_USING_LCD
             bool "Enable LCD"
@@ -105,17 +112,6 @@ menu "Hardware Drivers Config"
                 default n
         endmenu
 
-        menu "UART Drivers"
-            config BSP_USING_UART0
-                bool "Enable UART0 (PA2/3,RX/TX)"
-                select RT_USING_SERIAL
-                default y
-
-            config BSP_USING_UART1
-                bool "Enable UART1 (PC2/3,RX/TX)"
-                select RT_USING_SERIAL
-                default n
-        endmenu
 
     endmenu
 
